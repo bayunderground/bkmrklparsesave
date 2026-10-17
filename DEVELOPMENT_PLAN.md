@@ -225,11 +225,11 @@ Each phase ends runnable and verified before the next starts.
 - [x] A copy-paste prompt template (see §5)
 
 ### Phase 7 — NGINX and `install.sh`
-- [ ] `nginx.conf` template: `listen ${NGINX_BIND}:${NGINX_PORT}; client_max_body_size 6m;` `location / { proxy_pass http://127.0.0.1:${APP_PORT}; ... }` (only `/save` and `/health` need to work; keep it minimal)
-- [ ] Installer steps: root check → detect Python 3 (install `python3` if missing) → detect NGINX (apt install if missing) → require `DEPLOY_ENV` (`dev`|`live`) and set `APP_DIR` → create `SERVICE_USER` only if it isn't `root` and doesn't exist → copy `server.py` to `APP_DIR` → create data dir with permissions → write systemd unit (`User=$SERVICE_USER`, `Restart=on-failure`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ReadWritePaths=$DATA_DIR`; unit name `bkmrklparsesave.service`) → `daemon-reload`, `enable --now` → render NGINX site to `sites-available`, symlink (or `conf.d` fallback), idempotent → port-in-use check → `nginx -t` (revert and abort on failure) → reload → `curl /health` through NGINX → print URL, `@connect` line to put in the userscript, and `systemctl`/`journalctl` commands
-- [ ] Reruns: overwrite our own unit/site/app file only; never touch other NGINX files; never recreate users/dirs that exist; keep existing data
-- [ ] All settings overridable: `DEPLOY_ENV`, `APP_DIR`, `DATA_DIR`, `APP_PORT`, `NGINX_PORT`, `NGINX_BIND`, `SERVICE_USER`, `SERVER_NAME` (default `_`)
-- [ ] `tests/test_nginx.sh`: health via proxy, POST save through proxy, duplicate skip through proxy
+- [x] `nginx.conf` template: `listen ${NGINX_BIND}:${NGINX_PORT}; client_max_body_size 6m;` `location / { proxy_pass http://127.0.0.1:${APP_PORT}; ... }` (only `/save` and `/health` need to work; keep it minimal)
+- [x] Installer steps: root check → detect Python 3 (install `python3` if missing) → detect NGINX (apt install if missing) → require `DEPLOY_ENV` (`dev`|`live`) and set `APP_DIR` → create `SERVICE_USER` only if it isn't `root` and doesn't exist → copy `server.py` to `APP_DIR` → create data dir with permissions → write systemd unit (`User=$SERVICE_USER`, `Restart=on-failure`, `NoNewPrivileges=yes`, `ProtectSystem=strict`, `ReadWritePaths=$DATA_DIR`; unit name `bkmrklparsesave.service`) → `daemon-reload`, `enable --now` → render NGINX site to `sites-available`, symlink (or `conf.d` fallback), idempotent → port-in-use check → `nginx -t` (revert and abort on failure) → reload → `curl /health` through NGINX → print URL, `@connect` line to put in the userscript, and `systemctl`/`journalctl` commands
+- [x] Reruns: overwrite our own unit/site/app file only; never touch other NGINX files; never recreate users/dirs that exist; keep existing data
+- [x] All settings overridable: `DEPLOY_ENV`, `APP_DIR`, `DATA_DIR`, `APP_PORT`, `NGINX_PORT`, `NGINX_BIND`, `SERVICE_USER`, `SERVER_NAME` (default `_`)
+- [x] `tests/test_nginx.sh`: health via proxy, POST save through proxy, duplicate skip through proxy
 
 ### Phase 8 — `README.md`
 - [ ] What it is (5 lines), install, Tampermonkey setup (including Chrome/Edge "Allow User Scripts"), bookmarklet install for Firefox and Chromium, first run walkthrough with the sample rule
