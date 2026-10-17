@@ -408,23 +408,24 @@
     );
   }
 
+  function renderErrors(ui, errors) {
+    if (!errors.length) return;
+    // Warnings, not failures: extraction continues, save stays available.
+    var box = el('div', 'errors');
+    box.appendChild(el('div', 'title', errors.length + ' warning(s):'));
+    errors.forEach(function (msg) {
+      box.appendChild(el('div', 'line', '• ' + msg));
+    });
+    ui.body.appendChild(box);
+  }
+
   function showResult(result) {
     closePreview();
     var ui = makeOverlay();
     preview = ui;
     ui.result = result;
     setHeaderCounts(ui, result.rule);
-
-    if (result.errors.length) {
-      // Warnings, not failures: extraction continues, save stays available.
-      var errBox = el('div', 'errors');
-      errBox.appendChild(el('div', 'title',
-        result.errors.length + ' warning(s):'));
-      result.errors.forEach(function (msg) {
-        errBox.appendChild(el('div', 'line', '• ' + msg));
-      });
-      ui.body.appendChild(errBox);
-    }
+    renderErrors(ui, result.errors);
 
     var tabs = el('div', 'tabs');
     var jsonBtn = el('button', 'primary', 'JSON');
@@ -447,15 +448,55 @@
     jsonBtn.addEventListener('click', function () { setMode('json'); });
     mdBtn.addEventListener('click', function () { setMode('md'); });
     setMode('json');
+    addCancel(ui);
+  }
 
+  function addCancel(ui) {
     var cancel = el('button', '', 'Cancel');
     cancel.addEventListener('click', closePreview); // transmits nothing
     ui.footer.appendChild(cancel);
   }
 
+  function showNone(start) {
+    closePreview();
+    var ui = makeOverlay();
+    preview = ui;
+    ui.header.appendChild(el('span', '', 'No matching rule'));
+    renderErrors(ui, start.errors);
+    ui.body.appendChild(el('p', 'message', 'No rule matches this URL:'));
+    ui.body.appendChild(el('pre', 'message', start.url));
+    ui.body.appendChild(el('p', 'message', 'Rules available:'));
+    start.available.forEach(function (summary) {
+      ui.body.appendChild(el('pre', 'message', '• ' + summary));
+    });
+    addCancel(ui);
+  }
+
+  function showMany(start) {
+    closePreview();
+    var ui = makeOverlay();
+    preview = ui;
+    ui.header.appendChild(el('span', '', 'Multiple rules match'));
+    ui.header.appendChild(el('span', 'count',
+      start.choices.length + ' candidates'));
+    renderErrors(ui, start.errors);
+    ui.body.appendChild(el('p', 'message', 'Choose a rule:'));
+    start.choices.forEach(function (choice) {
+      var btn = el('button', '', choice.label);
+      btn.style.display = 'block';
+      btn.style.margin = '4px 0';
+      btn.addEventListener('click', function () {
+        openPreview(extractChoice(choice));
+      });
+      ui.body.appendChild(btn);
+    });
+    addCancel(ui);
+  }
+
   function openPreview(start) {
     if (start.kind === 'one') showResult(start.result);
-    // 'none' and 'many' panels arrive with the picker step.
+    else if (start.kind === 'none') showNone(start);
+    else if (start.kind === 'many') showMany(start);
   }
 
   // TEMP dev trigger while the bookmarklet listener is not wired yet
