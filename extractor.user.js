@@ -97,4 +97,130 @@
     });
   }
 
+  // --- extraction engine ---
+
+  function isMissing(v) {
+    if (v === null || v === undefined || v === '') return true;
+    if (typeof v === 'number' && isNaN(v)) return true;
+    if (Array.isArray(v) && v.length === 0) return true;
+    return false;
+  }
+
+  function absUrl(v) {
+    try { return new URL(v, document.baseURI).href; } catch (err) { return v; }
+  }
+
+  function resolveField(spec, el, itemSoFar) {
+    if (typeof spec === 'function') return spec(el, itemSoFar);
+    if (typeof spec === 'string') {
+      var m = el.querySelector(spec);
+      return m ? m.textContent.trim() : undefined; // no match = missing, not an error
+    }
+    if (spec && typeof spec === 'object' && !Array.isArray(spec) &&
+        typeof spec.sel === 'string') {
+      if (spec.all) {
+        var out = [];
+        Array.prototype.forEach.call(el.querySelectorAll(spec.sel), function (n) {
+          var v = spec.attr ? n.getAttribute(spec.attr) : n.textContent.trim();
+          if (v !== null && v !== undefined) out.push(spec.abs ? absUrl(v) : v);
+        });
+        return out;
+      }
+      var node = el.querySelector(spec.sel);
+      if (!node) return undefined;
+      var raw = spec.attr ? node.getAttribute(spec.attr) : node.textContent.trim();
+      if (raw === null || raw === undefined) return undefined;
+      return spec.abs ? absUrl(raw) : raw;
+    }
+    throw new Error('unsupported field spec (want selector, {sel}, or function)');
+  }
+
+  function normalizeValue(v) {
+    if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+      throw new Error('unsupported value type (want string/number/boolean/array)');
+    }
+    if (Array.isArray(v)) {
+      return v.filter(function (x) {
+        return x !== null && x !== undefined &&
+          !(typeof x === 'number' && isNaN(x)) && x !== '';
+      });
+    }
+    return v;
+  }
+
+  function extractItems(rule, doc, errors) {
+    if (!rule.fields || Object.keys(rule.fields).length === 0) {
+      errors.push(errText(rule.name, null, null, new Error('rule has no fields')));
+      return [];
+    }
+    var els;
+    try {
+      if (typeof rule.items === 'function') {
+        els = rule.items(doc);
+      } else if (typeof rule.items === 'string') {
+        els = Array.prototype.slice.call(doc.querySelectorAll(rule.items));
+      } else {
+        throw new Error('items must be a selector or a function');
+      }
+    } catch (err) {
+      errors.push(errText(rule.name, null, null, err));
+      return [];
+    }
+    if (!Array.isArray(els)) {
+      errors.push(errText(rule.name, null, null,
+        new Error('items function must return an array of elements')));
+      return [];
+    }
+
+    var items = [];
+    els.forEach(function (el, index) {
+      try {
+        var fields = {};
+        Object.keys(rule.fields).forEach(function (name) {
+          var value;
+          try {
+            value = normalizeValue(resolveField(rule.fields[name], el, fields));
+          } catch (err) {
+            errors.push(errText(rule.name, index, name, err));
+            value = undefined;
+          }
+          if (!isMissing(value)) fields[name] = value;
+        });
+
+        if (typeof rule.filter === 'function') {
+          var keep;
+          try {
+            keep = rule.filter(fields, el) !== false;
+          } catch (err) {
+            errors.push(errText(rule.name, index, 'filter', err));
+            keep = true; // unsure? keep the item; the error stays visible
+          }
+          if (!keep) return;
+        }
+
+        if (Object.keys(fields).length === 0) {
+          errors.push(errText(rule.name, index, null,
+            new Error('no fields extracted, item skipped')));
+          return;
+        }
+
+        var out = { fields: fields };
+        if (typeof rule.id === 'function') {
+          try {
+            var idValue = rule.id(el);
+            if (typeof idValue === 'string' && idValue.trim()) {
+              out.id = idValue.trim();
+            }
+          } catch (err) {
+            errors.push(errText(rule.name, index, 'id', err)); // server falls back
+          }
+        }
+        items.push(out);
+      } catch (err) {
+        errors.push(errText(rule.name, index, null, err));
+      }
+    });
+    return items;
+  }
+
 })();
