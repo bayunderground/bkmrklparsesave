@@ -260,20 +260,35 @@ def _reject_constant(token):
     raise ValueError(token)
 
 
+def _reject_before_body(handler, status, message, drain):
+    """Reject before consuming the body: drain a bounded amount, then close,
+    so the client still streaming its request can receive the error."""
+    handler.close_connection = True
+    if drain:
+        try:
+            handler.rfile.read(drain)
+        except OSError:
+            pass
+    raise ValidationError(status, message)
+
+
 def read_json_body(handler):
     """Read and parse the request body; raises ValidationError on any problem."""
-    content_type = handler.headers.get("Content-Type", "")
-    if "application/json" not in content_type.split(";")[0].strip().lower():
-        raise ValidationError(415, "Content-Type must be application/json")
     length = handler.headers.get("Content-Length")
     if length is None:
         raise ValidationError(400, "Content-Length required")
     try:
         n = int(length)
     except ValueError:
+        handler.close_connection = True
         raise ValidationError(400, "bad Content-Length")
+    content_type = handler.headers.get("Content-Type", "")
+    if "application/json" not in content_type.split(";")[0].strip().lower():
+        _reject_before_body(handler, 415, "Content-Type must be application/json", n)
     if n > MAX_BODY:
-        raise ValidationError(413, "body too large (max 5 MB)")
+        # Drain at most a small multiple of the limit; the rest hits a closed
+        # socket — that is what the limit is for.
+        _reject_before_body(handler, 413, "body too large (max 5 MB)", min(n, MAX_BODY * 2))
     raw = handler.rfile.read(n)
     try:
         text = raw.decode("utf-8")
