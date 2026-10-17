@@ -238,6 +238,57 @@ reload_nginx() {
   systemctl reload nginx
 }
 
+cleanup_stale_site_files() {
+  # Exactly one site config: if this host uses sites-available, drop a leftover
+  # conf.d file from an older layout, and vice versa.
+  if [ -n "$NGINX_LINK" ] && [ -f /etc/nginx/conf.d/bkmrklparsesave.conf ]; then
+    rm -f /etc/nginx/conf.d/bkmrklparsesave.conf
+    echo "note: removed stale /etc/nginx/conf.d/bkmrklparsesave.conf"
+  fi
+  if [ -z "$NGINX_LINK" ]; then
+    if [ -f /etc/nginx/sites-available/bkmrklparsesave ]; then
+      rm -f /etc/nginx/sites-available/bkmrklparsesave
+    fi
+    if [ -L /etc/nginx/sites-enabled/bkmrklparsesave ]; then
+      rm -f /etc/nginx/sites-enabled/bkmrklparsesave
+    fi
+  fi
+}
+
+check_proxy_health() {
+  local probe i
+  case "$NGINX_BIND" in
+    0.0.0.0 | "::") probe="127.0.0.1" ;;
+    *) probe="$NGINX_BIND" ;;
+  esac
+  step "checking http://${probe}:${NGINX_PORT}/health through NGINX"
+  for i in $(seq 1 20); do
+    if curl -fsS --max-time 2 "http://${probe}:${NGINX_PORT}/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 0.5
+  done
+  die "NGINX proxy did not answer /health"
+}
+
+print_summary() {
+  local lan
+  lan=$(hostname -I 2>/dev/null | awk '{print $1}' || true)
+  echo
+  echo "bkmrklparsesave installed (DEPLOY_ENV=${DEPLOY_ENV})."
+  echo "  service   : systemctl status ${SERVICE_NAME}"
+  echo "              journalctl -u ${SERVICE_NAME} -f"
+  echo "  local     : http://127.0.0.1:${NGINX_PORT}/health  (nginx bind: ${NGINX_BIND})"
+  if [ -n "$lan" ]; then
+    echo "  LAN       : http://${lan}:${NGINX_PORT}/"
+    echo "  userscript: set CONFIG.server = \"http://${lan}:${NGINX_PORT}\""
+    echo "              and the header line:  // @connect ${lan}"
+  else
+    echo "  userscript: set CONFIG.server = \"http://<this-host>:${NGINX_PORT}\""
+    echo "              and the header line:  // @connect <this-host>"
+  fi
+}
+
 main() {
   require_root
   require_deploy_env
@@ -249,11 +300,13 @@ main() {
   install_systemd
   check_local_health
   nginx_site_paths
+  cleanup_stale_site_files
   check_port_free
   warn_if_data_exposed
   render_nginx_site
   reload_nginx
-  echo "preflight OK: APP_DIR=$APP_DIR DATA_DIR=$DATA_DIR"
+  check_proxy_health
+  print_summary
 }
 
 main "$@"
