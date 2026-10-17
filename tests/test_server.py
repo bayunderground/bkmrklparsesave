@@ -65,5 +65,76 @@ class HarnessTest(ServerTestCase):
         self.assertEqual(body, {"ok": True})
 
 
+class SaveDedupeTest(ServerTestCase):
+    def test_creates_file_and_appends(self):
+        status, body = self.save(
+            {
+                "rule": "products",
+                "url": "https://example.com/shop/page/2",
+                "items": [
+                    {"id": "SKU-1", "fields": {"Title": "First", "Price": 10}},
+                    {"fields": {"Title": "Second", "Price": 20}},
+                ],
+            }
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            body, {"ok": True, "rule": "products", "file": "products.md",
+                   "saved": 2, "skipped": 0}
+        )
+        text = self.read_md("products")
+        self.assertIn("## First", text)
+        self.assertIn("## Second", text)
+
+        status, body = self.save(
+            {"rule": "products", "items": [{"fields": {"Title": "Third"}}]}
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual((body["saved"], body["skipped"]), (1, 0))
+        self.assertIn("## Third", self.read_md("products"))
+
+    def test_repeat_submission_skips_everything(self):
+        payload = {
+            "rule": "shop",
+            "items": [
+                {"id": "A", "fields": {"Title": "Alpha"}},
+                {"fields": {"Title": "Beta"}},
+            ],
+        }
+        self.save(payload)
+        status, body = self.save(payload)
+        self.assertEqual(status, 200)
+        self.assertEqual((body["saved"], body["skipped"]), (0, 2))
+        text = self.read_md("shop")
+        self.assertEqual(text.count("<!-- item-id: "), 2)
+
+    def test_partial_overlap_skips_only_duplicates(self):
+        self.save({"rule": "mix", "items": [{"fields": {"Title": "One"}}]})
+        status, body = self.save(
+            {
+                "rule": "mix",
+                "items": [
+                    {"fields": {"Title": "One"}},
+                    {"fields": {"Title": "Two"}},
+                ],
+            }
+        )
+        self.assertEqual((body["saved"], body["skipped"]), (1, 1))
+        self.assertEqual(self.read_md("mix").count("<!-- item-id: "), 2)
+
+    def test_duplicate_within_one_request(self):
+        status, body = self.save(
+            {
+                "rule": "dup",
+                "items": [
+                    {"fields": {"Title": "Same"}},
+                    {"fields": {"Title": "Same"}},
+                ],
+            }
+        )
+        self.assertEqual((body["saved"], body["skipped"]), (1, 1))
+        self.assertEqual(self.read_md("dup").count("## Same"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
