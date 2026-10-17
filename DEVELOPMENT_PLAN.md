@@ -194,20 +194,20 @@ Each phase ends runnable and verified before the next starts.
 - [x] Concurrency: 20 threads post overlapping items; final file has each ID exactly once, intact sections
 
 ### Phase 3 — Userscript engine (no UI yet)
-- [ ] Header per §2.2, `CONFIG`, empty RULES block with the sample `products` rule for `tests/fixtures/shop.html`
-- [ ] Rule matching (string/RegExp/function), selection of candidates
-- [ ] Item discovery (selector or function), field resolution (selector string / object / function), missing-value handling, `filter`, explicit `id`
-- [ ] Error collection (rule-level and per-field) returned alongside items
-- [ ] Output: `{ rule, url, items:[{id?, fields}], errors:[...] }` matching §2.4
-- [ ] Console-only trigger for development, removed or hidden behind the real trigger by Phase 5
+- [x] Header per §2.2, `CONFIG`, empty RULES block with the sample `products` rule for `tests/fixtures/shop.html`
+- [x] Rule matching (string/RegExp/function), selection of candidates
+- [x] Item discovery (selector or function), field resolution (selector string / object / function), missing-value handling, `filter`, explicit `id`
+- [x] Error collection (rule-level and per-field) returned alongside items
+- [x] Output: `{ rule, url, items:[{id?, fields}], errors:[...] }` matching §2.4
+- [x] Console-only trigger for development, removed or hidden behind the real trigger by Phase 5
 
 ### Phase 4 — Preview UI
-- [ ] Closed Shadow DOM overlay; fixed header (rule name, item count, error count) and footer; scrollable body
-- [ ] Toggle JSON ⇄ Markdown (Markdown is a client-side approximation of the server format; label it as such)
-- [ ] Errors panel at top, visible by default when non-empty
-- [ ] No-rule panel and multi-rule picker
-- [ ] Buttons: **Save All**, **Cancel** (and Esc closes); Cancel removes the overlay and transmits nothing
-- [ ] Usable on pages with hundreds of items (render text in a single `<pre>`, not per-item DOM nodes)
+- [x] Closed Shadow DOM overlay; fixed header (rule name, item count, error count) and footer; scrollable body
+- [x] Toggle JSON ⇄ Markdown (Markdown is a client-side approximation of the server format; label it as such)
+- [x] Errors panel at top, visible by default when non-empty
+- [x] No-rule panel and multi-rule picker
+- [x] Buttons: **Save All**, **Cancel** (and Esc closes); Cancel removes the overlay and transmits nothing
+- [x] Usable on pages with hundreds of items (render text in a single `<pre>`, not per-item DOM nodes)
 
 ### Phase 5 — Transport and bookmarklet
 - [ ] `GM_xmlhttpRequest` POST to `CONFIG.server + '/save'`, `Content-Type: application/json`, 15 s timeout, no retry
