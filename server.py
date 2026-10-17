@@ -9,6 +9,7 @@ import math
 import os
 import re
 import sys
+import threading
 import traceback
 import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +22,10 @@ DATA_DIR = Path(os.environ.get("BKMRKLPARSESAVE_DATA", "./data")).resolve()
 MAX_BODY = 5 * 1024 * 1024
 MAX_ITEMS = 1000
 RULE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+MARKER_RE = re.compile(r"^<!-- item-id: ([0-9a-f]{16}) -->$", re.MULTILINE)
+
+# One process: read-ids -> filter -> append must not interleave between requests.
+SAVE_LOCK = threading.Lock()
 
 
 def identifier_text(item):
@@ -120,6 +125,45 @@ def render_section(item, marker):
     lines.append("")
     lines.append("---")
     return "\n".join(lines)
+
+
+def existing_ids(path):
+    """All marker IDs already present in the target file."""
+    if not path.is_file():
+        return set()
+    return set(MARKER_RE.findall(path.read_text(encoding="utf-8")))
+
+
+def append_text(path, chunk):
+    """Append chunk, ending the file with exactly one newline; durable write."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as fh:
+        if path.stat().st_size > 0:
+            with open(path, "rb") as probe:
+                probe.seek(-1, os.SEEK_END)
+                if probe.read(1) != b"\n":
+                    fh.write("\n")
+            fh.write("\n")  # blank line between old content and the new section
+        fh.write(chunk)
+        fh.flush()
+        os.fsync(fh.fileno())
+
+
+def save_items(payload):
+    """Dedupe against the file and append new sections. Returns (path, n, skipped)."""
+    path = validate_rule_path(payload["rule"])
+    with SAVE_LOCK:
+        ids = existing_ids(path)
+        sections = []
+        for item in payload["items"]:
+            mid = marker_id(item)
+            if mid in ids:
+                continue
+            ids.add(mid)  # also skips duplicates within the same request
+            sections.append(render_section(item, mid))
+        if sections:
+            append_text(path, "\n\n".join(sections) + "\n")
+    return path, len(sections), len(payload["items"]) - len(sections)
 
 
 class ValidationError(Exception):
@@ -285,7 +329,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error_json(404, "not found")
             return
         payload = validate_payload(read_json_body(self))
-        self.send_error_json(501, "not implemented")
+        path, saved, skipped = save_items(payload)
+        self.send_json(
+            200,
+            {
+                "ok": True,
+                "rule": payload["rule"],
+                "file": path.name,
+                "saved": saved,
+                "skipped": skipped,
+            },
+        )
 
     def send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
