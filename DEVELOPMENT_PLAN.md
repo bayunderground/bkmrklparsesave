@@ -232,12 +232,12 @@ Each phase ends runnable and verified before the next starts.
 - [x] `tests/test_nginx.sh`: health via proxy, POST save through proxy, duplicate skip through proxy
 
 ### Phase 8 — `README.md`
-- [ ] What it is (5 lines), install, Tampermonkey setup (including Chrome/Edge "Allow User Scripts"), bookmarklet install for Firefox and Chromium, first run walkthrough with the sample rule
-- [ ] Adding a rule with an LLM (workflow + prompt example)
-- [ ] Duplicate rules and the first-field caveat
-- [ ] Limitations: dynamic content, iframes, CSP/Firefox, `@connect` needs editing when the server address changes, `javascript:` bookmarklets disabled in some locked-down browsers/policies
-- [ ] Security note: HTTP unencrypted, no auth, don't expose to the internet, use `NGINX_BIND`/firewall/VPN
-- [ ] Troubleshooting table: no ack alert, no matching rule, connect-permission prompt, server unreachable, nginx port clash
+- [x] What it is (5 lines), install, Tampermonkey setup (including Chrome/Edge "Allow User Scripts"), bookmarklet install for Firefox and Chromium, first run walkthrough with the sample rule
+- [x] Adding a rule with an LLM (workflow + prompt example)
+- [x] Duplicate rules and the first-field caveat
+- [x] Limitations: dynamic content, iframes, CSP/Firefox, `@connect` needs editing when the server address changes, `javascript:` bookmarklets disabled in some locked-down browsers/policies
+- [x] Security note: HTTP unencrypted, no auth, don't expose to the internet, use `NGINX_BIND`/firewall/VPN
+- [x] Troubleshooting table: no ack alert, no matching rule, connect-permission prompt, server unreachable, nginx port clash
 
 ### Phase 9 — End-to-end verification (manual, recorded in `tests/MANUAL.md`)
 Serve fixtures: `python3 -m http.server 8000 --directory tests/fixtures` and add a rule matching `localhost:8000/shop.html`.
