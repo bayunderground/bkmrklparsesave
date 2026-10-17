@@ -185,11 +185,13 @@ class IdFallbackTest(ServerTestCase):
         self.assertEqual((b[1]["saved"], b[1]["skipped"]), (1, 0))
 
     def test_hash_fallback_is_key_order_independent(self):
+        # First field stays empty (so the hash fallback kicks in); the keys
+        # after it are reordered — canonical JSON must give the same marker.
         one = self.save(
             {"rule": "order", "items": [{"fields": {"A": "", "B": "", "C": "v"}}]}
         )
         two = self.save(
-            {"rule": "order", "items": [{"fields": {"C": "v", "B": "", "A": ""}}]}
+            {"rule": "order", "items": [{"fields": {"A": "", "C": "v", "B": ""}}]}
         )
         self.assertEqual((one[1]["saved"], one[1]["skipped"]), (1, 0))
         self.assertEqual((two[1]["saved"], two[1]["skipped"]), (0, 1))
@@ -199,7 +201,7 @@ class IdFallbackTest(ServerTestCase):
             {"rule": "cannon", "items": [{"fields": {"A": "", "B": "", "X": "1", "Y": "2"}}]}
         )
         status, body = self.save(
-            {"rule": "cannon", "items": [{"fields": {"Y": "2", "X": "1", "B": "", "A": ""}}]}
+            {"rule": "cannon", "items": [{"fields": {"A": "", "Y": "2", "X": "1", "B": ""}}]}
         )
         self.assertEqual((body["saved"], body["skipped"]), (0, 1))
 
