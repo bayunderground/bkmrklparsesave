@@ -3,12 +3,14 @@
 
 Stdlib only. Binds to 127.0.0.1; NGINX proxies to it. No auth.
 """
+import hashlib
 import json
 import math
 import os
 import re
 import sys
 import traceback
+import unicodedata
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -19,6 +21,36 @@ DATA_DIR = Path(os.environ.get("BKMRKLPARSESAVE_DATA", "./data")).resolve()
 MAX_BODY = 5 * 1024 * 1024
 MAX_ITEMS = 1000
 RULE_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+
+
+def identifier_text(item):
+    """Which text identifies this item, per the duplicate-detection contract.
+
+    explicit id -> first field value -> canonical JSON of fields.
+    Result is NFC-normalized and stripped; empty means "not usable".
+    """
+    fields = item["fields"]
+    if item.get("id"):
+        text = item["id"]
+    else:
+        first = next(iter(fields.values()))
+        if isinstance(first, list):
+            text = "\n".join(str(v) for v in first if v is not None)
+        else:
+            text = str(first)
+    text = unicodedata.normalize("NFC", text).strip()
+    if not text:
+        text = json.dumps(
+            fields, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+        )
+        text = unicodedata.normalize("NFC", text).strip()
+    return text
+
+
+def marker_id(item):
+    """16 hex chars of SHA-256 over the identifier text: never contains user text."""
+    digest = hashlib.sha256(identifier_text(item).encode("utf-8")).hexdigest()
+    return digest[:16]
 
 
 class ValidationError(Exception):
