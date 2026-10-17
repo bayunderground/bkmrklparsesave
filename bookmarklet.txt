@@ -1,0 +1,31 @@
+# bkmrklparsesave bookmarklet — one reusable javascript: URL for every site.
+# Requires: Tampermonkey with the bkmrklparsesave extractor userscript installed.
+
+## Install: Firefox
+# 1. Right-click the bookmarks toolbar -> "Bookmark This Page..." (or Ctrl+D).
+# 2. Name it e.g. "Extract". Paste the javascript: line below into the URL field.
+# 3. Or simply drag the javascript: line from this file onto the bookmarks toolbar.
+
+## Install: Chrome / Edge / Brave / Vivaldi
+# 1. Open the bookmark manager (Ctrl+Shift+O / chrome://bookmarks).
+# 2. Add a new bookmark, name e.g. "Extract".
+# 3. Paste the javascript: line below into the URL field.
+# 4. Chrome/Edge 138+: open the Tampermonkey extension details and turn ON
+#    "Allow User Scripts" (older versions: enable Developer Mode under
+#    chrome://extensions). Otherwise no userscript runs and nothing will answer.
+
+## If a site blocks javascript: bookmarklets (CSP)
+# Chrome ignores page CSP for bookmarklets; some Firefox pages still refuse them.
+# Fallback: Tampermonkey menu -> "Extract this page" runs the same extraction.
+
+## The bookmarklet (single line, copy everything below):
+
+javascript:(function(){var%20t=setTimeout(function(){alert('bkmrklparsesave:%20userscript%20did%20not%20respond.%20Check%20Tampermonkey%20is%20enabled%20(Chrome/Edge:%20%22Allow%20User%20Scripts%22),%20and%20the%20script%20is%20installed.')},1000);addEventListener('message',function%20h(e){if(e.source===window&&e.data==='bkmrklparsesave:ack'){clearTimeout(t);removeEventListener('message',h)}});postMessage('bkmrklparsesave:run','*');})();void%200
+
+## Readable source of the same line:
+
+javascript:(function(){
+  var t=setTimeout(function(){alert('bkmrklparsesave: userscript did not respond. Check Tampermonkey is enabled (Chrome/Edge: "Allow User Scripts"), and the script is installed.')},1000);
+  addEventListener('message',function h(e){if(e.source===window&&e.data==='bkmrklparsesave:ack'){clearTimeout(t);removeEventListener('message',h)}});
+  postMessage('bkmrklparsesave:run','*');
+})();void 0
