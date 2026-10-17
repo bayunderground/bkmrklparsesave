@@ -319,7 +319,10 @@
       '.errors { background: #3a2a12; border: 1px solid #7a5a20;',
       '  padding: 8px 10px; margin-bottom: 10px; color: #ffb454; }',
       '.errors .title { font-weight: bold; margin-bottom: 4px; }',
-      '.errors .line { white-space: pre-wrap; }'
+      '.errors .line { white-space: pre-wrap; }',
+      '.status { padding: 8px 10px; margin-bottom: 10px; white-space: pre-wrap; }',
+      '.status.ok { background: #12301a; border: 1px solid #2e7d40; color: #9ae6b4; }',
+      '.status.err { background: #3a1212; border: 1px solid #7a2020; color: #ff9c9c; }'
     ].join('\n');
     shadow.appendChild(style);
 
@@ -450,10 +453,60 @@
     setMode('json');
 
     var saveBtn = el('button', 'primary', 'Save All');
-    saveBtn.disabled = true; // enabled when the transport lands (Phase 5)
     ui.saveBtn = saveBtn;
+    saveBtn.addEventListener('click', function () { saveResult(result, ui); });
     ui.footer.appendChild(saveBtn);
     addCancel(ui);
+  }
+
+  // --- transport: POST /save through Tampermonkey (page CSP does not apply) ---
+
+  function showStatus(ui, ok, text) {
+    var box = el('div', 'status ' + (ok ? 'ok' : 'err'), text);
+    ui.body.insertBefore(box, ui.body.firstChild);
+    ui.body.scrollTop = 0;
+  }
+
+  function saveResult(result, ui) {
+    ui.saveBtn.disabled = true; // first click wins; no auto-retry afterwards
+    var payload = {
+      rule: result.rule,
+      url: result.url,
+      items: result.items // {id?, fields} per contract; errors are never sent
+    };
+    GM_xmlhttpRequest({
+      method: 'POST',
+      url: CONFIG.server + '/save',
+      headers: { 'Content-Type': 'application/json' },
+      data: JSON.stringify(payload),
+      timeout: CONFIG.saveTimeoutMs,
+      onload: function (resp) { handleSaveResponse(resp, ui); },
+      onerror: function () {
+        showStatus(ui, false,
+          'Network error: server unreachable. Check CONFIG.server and that '
+          + 'the server is running. Nothing may have been written.');
+      },
+      ontimeout: function () {
+        showStatus(ui, false,
+          'Timeout after ' + (CONFIG.saveTimeoutMs / 1000) + 's: the write may '
+          + 'or may not have happened. Re-saving is safe — duplicates are '
+          + 'skipped.');
+      }
+    });
+  }
+
+  function handleSaveResponse(resp, ui) {
+    var body = null;
+    try { body = JSON.parse(resp.responseText); } catch (err) { /* not JSON */ }
+    if (resp.status === 200 && body && body.ok) {
+      showStatus(ui, true,
+        'Saved ' + body.saved + ', skipped ' + body.skipped + ' → '
+        + body.file);
+      return;
+    }
+    var detail = body && typeof body.error === 'string'
+      ? body.error : (resp.responseText || '').slice(0, 300);
+    showStatus(ui, false, 'HTTP ' + resp.status + ': ' + detail);
   }
 
   function addCancel(ui) {
