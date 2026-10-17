@@ -302,5 +302,130 @@ class MarkdownSafetyTest(ServerTestCase):
             self.assertTrue(line.startswith("  "), repr(line))
 
 
+class ValidationTest(ServerTestCase):
+    def test_invalid_rule_names_rejected_and_nothing_written(self):
+        before_data = sorted(p.name for p in self.data.iterdir())
+        before_parent = sorted(p.name for p in self.data.parent.iterdir())
+        for bad in ["../x", "a/b", "A", "", "x" * 65, ".hidden", "x.md", "a b", "a.b"]:
+            status, body = self.save({"rule": bad, "items": [{"fields": {"T": "v"}}]})
+            self.assertEqual(status, 400, (bad, status, body))
+            self.assertFalse(body["ok"])
+            self.assertIsInstance(body["error"], str)
+        # Nothing created, inside the data dir or anywhere next to it.
+        self.assertEqual(sorted(p.name for p in self.data.iterdir()), before_data)
+        self.assertEqual(
+            sorted(p.name for p in self.data.parent.iterdir()), before_parent
+        )
+
+    def test_valid_boundary_rule_names_accepted(self):
+        for good in ["a", "0", "products", "a" * 64, "a-b_c-9"]:
+            status, body = self.save({"rule": good, "items": [{"fields": {"T": "v"}}]})
+            self.assertEqual(status, 200, (good, status, body))
+            self.assertTrue((self.data / f"{good}.md").is_file())
+
+    def test_malformed_and_wrong_shape_bodies(self):
+        cases = [
+            (b"{not json", "application/json"),
+            (b"", "application/json"),
+            (b"\xff\xfe", "application/json"),
+            (b'{"rule":"ok","items":[{"fields":{"T":NaN}}]}', "application/json"),
+        ]
+        for raw, ctype in cases:
+            status, body = self.save(None, raw=raw, ctype=ctype)
+            self.assertEqual(status, 400, (raw, status, body))
+            self.assertFalse(body["ok"])
+
+        wrong = [
+            ("text/plain", b"{}"),
+            ("application/xml", b"{}"),
+        ]
+        for ctype, raw in wrong:
+            status, body = self.save(None, raw=raw, ctype=ctype)
+            self.assertEqual(status, 415, (ctype, status, body))
+
+    def test_wrong_types_rejected(self):
+        payloads = [
+            ["not", "an", "object"],
+            {"items": [{"fields": {"T": "v"}}]},                      # missing rule
+            {"rule": "ok", "items": "nope"},
+            {"rule": "ok", "items": []},
+            {"rule": "ok", "items": ["string"]},
+            {"rule": "ok", "items": [{"fields": {}}]},
+            {"rule": "ok", "items": [{"fields": "str"}]},
+            {"rule": "ok", "items": [{"fields": {"T": {"nested": 1}}}]},
+            {"rule": "ok", "items": [{"fields": {"T": [1, {"a": 1}]}}]},
+            {"rule": "ok", "items": [{"id": 42, "fields": {"T": "v"}}]},
+            {"rule": "ok", "url": 123, "items": [{"fields": {"T": "v"}}]},
+            {"rule": "ok", "items": [{"fields": {"T": None}}]},        # null-only
+        ]
+        for payload in payloads:
+            status, body = self.save(payload)
+            self.assertEqual(status, 400, (payload, status, body))
+            self.assertFalse(body["ok"])
+            self.assertNotIn("Traceback", json.dumps(body))
+
+    def test_item_count_limit(self):
+        items = [{"fields": {"T": str(i)}} for i in range(1001)]
+        status, body = self.save({"rule": "big", "items": items})
+        self.assertEqual(status, 400)
+        self.assertFalse((self.data / "big.md").exists())
+
+    def test_oversized_body_rejected(self):
+        status, body = self.save(
+            None,
+            raw=b"X" * (5 * 1024 * 1024 + 1),
+            ctype="application/json",
+        )
+        self.assertEqual(status, 413)
+        self.assertFalse(body["ok"])
+
+
+class ConcurrencyTest(ServerTestCase):
+    def test_twenty_threads_write_each_id_once(self):
+        import concurrent.futures
+
+        items = [{"fields": {"Title": f"Item {i}", "Price": i}} for i in range(5)]
+
+        def post(_):
+            status, body = self.save({"rule": "race", "items": items})
+            self.assertEqual(status, 200)
+            return body
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+            results = list(pool.map(post, range(20)))
+
+        saved_total = sum(r["saved"] for r in results)
+        self.assertEqual(saved_total, 5)  # across 20 posts, only 5 new
+
+        text = self.read_md("race")
+        markers = [l for l in text.split("\n") if l.startswith("<!-- item-id:")]
+        self.assertEqual(len(markers), 5)
+        self.assertEqual(len(set(markers)), 5)  # each exactly once
+        # Sections intact: every heading present exactly once, file well-formed.
+        for i in range(5):
+            self.assertEqual(text.count(f"## Item {i}\n"), 1)
+        self.assertTrue(text.endswith("---\n"))
+        parts = text.split("\n\n## ")
+        self.assertEqual(len(parts), 5)  # 5 sections joined by blank lines
+
+    def test_interleaved_different_rules_do_not_interfere(self):
+        import concurrent.futures
+
+        def post(rule, title):
+            status, _ = self.save({"rule": rule, "items": [{"fields": {"T": title}}]})
+            self.assertEqual(status, 200)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+            jobs = []
+            for i in range(10):
+                jobs.append(pool.submit(post, "alpha", f"A{i}"))
+                jobs.append(pool.submit(post, "beta", f"B{i}"))
+            for job in jobs:
+                job.result()
+
+        self.assertEqual(self.read_md("alpha").count("<!-- item-id: "), 10)
+        self.assertEqual(self.read_md("beta").count("<!-- item-id: "), 10)
+
+
 if __name__ == "__main__":
     unittest.main()
