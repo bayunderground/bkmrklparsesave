@@ -127,3 +127,31 @@ so re-running a page is always safe.
   user scripts entirely; nothing can work then.
 - **Chromium "Allow User Scripts":** required since Chrome/Edge 138 (see
   above); if the userscript never answers, this is the first thing to check.
+
+## Security — read this
+
+**HTTP is unencrypted and the endpoint has no authentication.** Anyone who can
+reach `NGINX_BIND:NGINX_PORT` can write to your Markdown files. The Python
+server binds to `127.0.0.1` only; NGINX is the public door.
+
+- **Never expose this to the open internet.** No auth system exists, by
+  design, and none will be added.
+- Keep `NGINX_BIND=0.0.0.0` only on a trusted LAN, or bind it to a VPN/LAN IP
+  (`NGINX_BIND=192.168.1.10`), and/or firewall the port.
+- HTTPS is not part of this project: traffic between your browser and the
+  server is plain HTTP.
+
+## Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| Alert: "userscript did not respond" after ~1 s | Tampermonkey missing/disabled, user scripts not allowed, or script not installed | Check Tampermonkey is enabled; Chrome/Edge: turn ON "Allow User Scripts" in the extension details; confirm the script is installed and enabled |
+| No alert at all, nothing happens | Bookmarklet URL mangled (line broken when copied) | Re-copy the single line from `bookmarklet.txt` |
+| Preview says "No matching rule" | No rule's `match` fits this URL | Check the listed rules; fix/add a rule for this site |
+| Menu fallback also does nothing | Script not running on this site | Verify `@match http://*/*` lines are intact in the userscript |
+| Tampermonkey asks for permission to connect | First request to a new host | Allow it; ensure `@connect <host>` matches `CONFIG.server` |
+| Save shows "Network error" | Server/NGINX down, wrong host/port, firewall | `curl http://<host>:<port>/health`; `systemctl status bkmrklparsesave`; check `CONFIG.server` and `@connect` |
+| Save shows "Timeout … may or may not have happened" | Slow or unreachable server within 15 s | Re-saving is safe (duplicates skipped); check service logs |
+| Installer aborts: port already in use | Another service/site on `NGINX_PORT` | Pick a free port: `NGINX_PORT=9099 sudo DEPLOY_ENV=dev bash install.sh` |
+| Installer aborts: `nginx -t` failed | Rendered config rejected | Our site file was removed automatically and nginx was not reloaded; inspect `nginx -t` output |
+| `404` through the proxy is JSON from the server | Unknown path (only `/save` and `/health` exist) | Expected |
