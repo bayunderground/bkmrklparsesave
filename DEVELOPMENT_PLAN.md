@@ -177,21 +177,21 @@ Each phase ends runnable and verified before the next starts.
 - [x] `tests/fixtures/` with `shop.html` (≥5 product cards, one sold out, one with multiline description, Unicode/emoji text, one without price) and `empty.html`
 
 ### Phase 1 — `server.py`
-- [ ] Config via env: `BKMRKLPARSESAVE_HOST` (default `127.0.0.1`), `BKMRKLPARSESAVE_PORT` (`8765`), `BKMRKLPARSESAVE_DATA` (`./data`)
-- [ ] `ThreadingHTTPServer`; `POST /save`, `GET /health`; others → 404/405
-- [ ] Validation: content-type JSON, size ≤ 5 MB, valid UTF-8 JSON, structure per §2.4, rule-name regex, path containment check, ≤ 1000 items
-- [ ] ID computation, dedupe, rendering, append per §2.5 under one global lock
-- [ ] Clear JSON errors; no tracebacks to clients; one-line stderr log per request (journald picks it up)
-- [ ] Target: ~150–200 lines
+- [x] Config via env: `BKMRKLPARSESAVE_HOST` (default `127.0.0.1`), `BKMRKLPARSESAVE_PORT` (`8765`), `BKMRKLPARSESAVE_DATA` (`./data`)
+- [x] `ThreadingHTTPServer`; `POST /save`, `GET /health`; others → 404/405
+- [x] Validation: content-type JSON, size ≤ 5 MB, valid UTF-8 JSON, structure per §2.4, rule-name regex, path containment check, ≤ 1000 items
+- [x] ID computation, dedupe, rendering, append per §2.5 under one global lock
+- [x] Clear JSON errors; no tracebacks to clients; one-line stderr log per request (journald picks it up)
+- [x] Target: ~150–200 lines
 
 ### Phase 2 — Server tests (`tests/test_server.py`, `unittest` + `urllib`, server started on a random port with a temp dir)
-- [ ] Creates file; appends new; second identical POST → `saved=0, skipped=N`
-- [ ] Explicit id, first-field fallback, hash fallback (including key-order independence)
-- [ ] First-field collision case behaves as documented
-- [ ] Unicode + multiline + values containing `---`, `## x`, `<!-- item-id: 0123456789abcdef -->` → no forged marker, no extra sections
-- [ ] Invalid rule names (`../x`, `a/b`, `A`, empty, 65 chars, `.hidden`, `x.md`) → 400, nothing written outside the data dir
-- [ ] Malformed JSON, wrong types, missing fields, empty items, oversized body → 4xx JSON
-- [ ] Concurrency: 20 threads post overlapping items; final file has each ID exactly once, intact sections
+- [x] Creates file; appends new; second identical POST → `saved=0, skipped=N`
+- [x] Explicit id, first-field fallback, hash fallback (including key-order independence)
+- [x] First-field collision case behaves as documented
+- [x] Unicode + multiline + values containing `---`, `## x`, `<!-- item-id: 0123456789abcdef -->` → no forged marker, no extra sections
+- [x] Invalid rule names (`../x`, `a/b`, `A`, empty, 65 chars, `.hidden`, `x.md`) → 400, nothing written outside the data dir
+- [x] Malformed JSON, wrong types, missing fields, empty items, oversized body → 4xx JSON
+- [x] Concurrency: 20 threads post overlapping items; final file has each ID exactly once, intact sections
 
 ### Phase 3 — Userscript engine (no UI yet)
 - [ ] Header per §2.2, `CONFIG`, empty RULES block with the sample `products` rule for `tests/fixtures/shop.html`
