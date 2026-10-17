@@ -315,7 +315,11 @@
       '.tabs { margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }',
       '.tabs .note { color: #9c9c9c; font-size: 12px; }',
       'pre { margin: 0; white-space: pre-wrap; word-break: break-word; }',
-      '.message { color: #d0d0d0; }'
+      '.message { color: #d0d0d0; }',
+      '.errors { background: #3a2a12; border: 1px solid #7a5a20;',
+      '  padding: 8px 10px; margin-bottom: 10px; color: #ffb454; }',
+      '.errors .title { font-weight: bold; margin-bottom: 4px; }',
+      '.errors .line { white-space: pre-wrap; }'
     ].join('\n');
     shadow.appendChild(style);
 
@@ -410,6 +414,17 @@
     preview = ui;
     ui.result = result;
     setHeaderCounts(ui, result.rule);
+
+    if (result.errors.length) {
+      // Warnings, not failures: extraction continues, save stays available.
+      var errBox = el('div', 'errors');
+      errBox.appendChild(el('div', 'title',
+        result.errors.length + ' warning(s):'));
+      result.errors.forEach(function (msg) {
+        errBox.appendChild(el('div', 'line', '• ' + msg));
+      });
+      ui.body.appendChild(errBox);
+    }
 
     var tabs = el('div', 'tabs');
     var jsonBtn = el('button', 'primary', 'JSON');
