@@ -216,13 +216,13 @@ Each phase ends runnable and verified before the next starts.
 - [x] `bookmarklet.txt` with the `javascript:` URL (URL-safe, single line) and install notes for Firefox (bookmarks toolbar → Add bookmark; or drag) and Chromium (bookmark manager → Add new bookmark; paste into URL), including the Chrome/Edge "Allow User Scripts" step and the CSP fallback
 
 ### Phase 6 — `extractor-spec.md` (written for an LLM reader)
-- [ ] Task statement: "Output exactly one `rules.push({...});` block and nothing else"
-- [ ] Full rule API from §2.3 with the allowed forms, helper functions, and value rules
-- [ ] 3 worked examples (simple list; computed + filter; conditional/optional fields with explicit `id`)
-- [ ] Limitations: runs on the live DOM, no network calls, no shadow-DOM/iframe access unless the sample shows it, no pagination
-- [ ] Hard rules: use only selectors present in the supplied HTML; no invented classes; prefer stable attributes over `nth-child`; first field is title and ID fallback, so put the most identifying field first; add `id` when a stable one exists (e.g. data attribute or URL slug)
-- [ ] "Uncertainties" section: after the rule, list anything the HTML sample couldn't confirm (missing states, truncated HTML, ambiguous selectors) and ask for more HTML instead of guessing
-- [ ] A copy-paste prompt template (see §5)
+- [x] Task statement: "Output exactly one `rules.push({...});` block and nothing else"
+- [x] Full rule API from §2.3 with the allowed forms, helper functions, and value rules
+- [x] 3 worked examples (simple list; computed + filter; conditional/optional fields with explicit `id`)
+- [x] Limitations: runs on the live DOM, no network calls, no shadow-DOM/iframe access unless the sample shows it, no pagination
+- [x] Hard rules: use only selectors present in the supplied HTML; no invented classes; prefer stable attributes over `nth-child`; first field is title and ID fallback, so put the most identifying field first; add `id` when a stable one exists (e.g. data attribute or URL slug)
+- [x] "Uncertainties" section: after the rule, list anything the HTML sample couldn't confirm (missing states, truncated HTML, ambiguous selectors) and ask for more HTML instead of guessing
+- [x] A copy-paste prompt template (see §5)
 
 ### Phase 7 — NGINX and `install.sh`
 - [ ] `nginx.conf` template: `listen ${NGINX_BIND}:${NGINX_PORT}; client_max_body_size 6m;` `location / { proxy_pass http://127.0.0.1:${APP_PORT}; ... }` (only `/save` and `/health` need to work; keep it minimal)
