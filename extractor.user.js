@@ -571,7 +571,4 @@
     openPreview(startExtraction());
   });
 
-  // TEMP dev trigger; removed once the bookmarklet path is the only one.
-  window.bkmrklDevRun = function () { openPreview(startExtraction()); };
-
 })();
