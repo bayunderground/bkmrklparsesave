@@ -108,3 +108,126 @@ Only these three exist; they are the whole "API":
 
 They are conveniences inside field functions; the plain forms
 (string / `{sel}` object) cover the same ground without them.
+
+## Worked example 1 — simple list
+
+Plain selectors, no computation:
+
+```js
+rules.push({
+  name: 'events',
+  match: 'example.com/events/',
+  items: '.event-row',
+  fields: {
+    Title: 'h2',
+    Date: { sel: 'time', attr: 'datetime' },
+    Venue: '.venue',
+    URL: { sel: 'a', attr: 'href', abs: true }
+  }
+});
+```
+
+## Worked example 2 — computed field + filter
+
+Parsing and skipping happen in functions; the computed field reads earlier
+fields:
+
+```js
+rules.push({
+  name: 'auctions',
+  match: /example\.com\/lots\//,
+  items: '.lot',
+  id: (el) => el.dataset.lotId,
+  filter: (item) => item.Bid !== undefined && item.Bid > 0,
+  fields: {
+    Title: '.lot-title',
+    Bid: (el) => {
+      const t = el.querySelector('.current-bid');
+      return t ? parseFloat(t.textContent.replace(/[^\d.]/g, '')) : null;
+    },
+    Ends: (el) => $attr(el, '.countdown', 'data-deadline'),
+    Bidders: (el) => parseInt(($text(el, '.bid-count') || '0'), 10),
+    High: (el, item) => item.Bid !== undefined && item.Bid > 1000
+  }
+});
+```
+
+`null` from `Bid` (no price node) means missing; `High` then stays missing
+too. `filter` drops items whose bid is missing or zero.
+
+## Worked example 3 — conditional/optional fields with explicit id
+
+Only some cards have a badge or an old price; one field is an array:
+
+```js
+rules.push({
+  name: 'books',
+  match: (url) => /example\.com\/books\//.test(url),
+  items: doc => Array.from(doc.querySelectorAll('li.book')),
+  id: (el) => el.getAttribute('data-isbn'),
+  filter: (item) => item.Price !== undefined,
+  fields: {
+    ISBN: (el) => el.getAttribute('data-isbn'),
+    Title: '.title',
+    Author: '.author',
+    Price: (el) => {
+      const t = el.querySelector('.price');
+      if (!t) return undefined;
+      const n = parseFloat(t.textContent.replace(/[^\d.]/g, ''));
+      return isNaN(n) ? undefined : n;
+    },
+    OldPrice: (el) => {
+      const t = el.querySelector('.price-old');
+      return t ? parseFloat(t.textContent.replace(/[^\d.]/g, '')) : null;
+    },
+    OnSale: (el) => !!el.querySelector('.badge-sale'),
+    Tags: { sel: '.tag', all: true },
+    URL: { sel: 'a.title', attr: 'href', abs: true }
+  }
+});
+```
+
+`OldPrice` is omitted when the node is absent; `OnSale` still appears as
+`false` (a boolean is a value, not a "missing").
+
+## Hard rules
+
+- Use **only** selectors that appear in the supplied HTML sample. Never
+  invent class names, attributes, or structure "that sites like this usually
+  have". If you cannot see it, you cannot select it.
+- Prefer stable attributes (`data-*`, `id`, `href`, semantic tags) over
+  positional selectors (`nth-child`, `:first-of-type`).
+- The first field is the title **and** the duplicate-identity fallback: put
+  the most identifying field first.
+- Add `id` whenever the HTML exposes a stable identifier (SKU, ISBN,
+  `data-*`, URL slug). Two different items that share their first-field value
+  are treated as duplicates — an explicit `id` prevents that.
+- No network calls, no timers, no mutation of the page. Read the DOM only.
+- Result values must stay within: string, number, boolean, or flat array of
+  those (plus `null`/`undefined`/`''`/`NaN` to mean "missing").
+
+## Limitations of the environment (design your rule around these)
+
+- The rule runs on the **live DOM at click time**: scroll or expand
+  everything first; content that only loads later is not there.
+- No network calls, no access to page JavaScript state.
+- Iframes and shadow DOM are not reachable unless the sample HTML shows the
+  content directly in the page.
+- No pagination: one page per run. The user navigates and runs again.
+- The sample HTML may be truncated; absence of a node in the sample is not
+  proof the site never shows it (see "Uncertainties").
+
+## Uncertainties section (required after the rule)
+
+After your `rules.push({...});` block, add a short section:
+
+```text
+Uncertainties:
+- <what the HTML sample could not confirm: missing states (out of stock,
+  empty results), truncated markup, ambiguous selector matches, assumptions
+  about URLs>
+- <if crucial: "need a sample of <state/page> to decide">
+```
+
+Never paper over uncertainty with a guessed selector: list it instead, and
+ask for more HTML rather than guessing.
