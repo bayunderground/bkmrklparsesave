@@ -296,37 +296,41 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self._run(self._post)
 
-    def do_PUT(self):
-        self._run(lambda: self.send_error_json(405, "method not allowed"))
-
-    def do_DELETE(self):
-        self._run(lambda: self.send_error_json(405, "method not allowed"))
-
-    def do_PATCH(self):
-        self._run(lambda: self.send_error_json(405, "method not allowed"))
+    def send_error(self, code, message=None, explain=None):
+        """Protocol errors and unsupported methods answer JSON, never HTML."""
+        self.close_connection = True
+        # This API has two endpoints: any method it lacks is simply not allowed.
+        if code == 501:
+            code, message = 405, "method not allowed"
+        self.send_json(code, {"ok": False, "error": message or "error"})
 
     def _run(self, fn):
         """Every response is JSON; clients never see a traceback or a drop."""
         try:
             fn()
         except ValidationError as exc:
-            self._reply(exc.status, {"ok": False, "error": exc.message})
+            self.send_error_json(exc.status, exc.message)
         except (BrokenPipeError, ConnectionResetError):
             pass
         except Exception:
             sys.stderr.write("internal error on %s %s\n" % (self.command, self.path))
             traceback.print_exc(file=sys.stderr)
-            self._reply(500, {"ok": False, "error": "internal server error"})
+            self.send_error_json(500, "internal server error")
 
     def _get(self):
         if self.path == "/health":
             self.send_json(200, {"ok": True})
+        elif self.path == "/save":
+            self.send_error_json(405, "method not allowed")
         else:
             self.send_error_json(404, "not found")
 
     def _post(self):
         if self.path != "/save":
-            self.send_error_json(404, "not found")
+            if self.path == "/health":
+                self.send_error_json(405, "method not allowed")
+            else:
+                self.send_error_json(404, "not found")
             return
         payload = validate_payload(read_json_body(self))
         path, saved, skipped = save_items(payload)
@@ -342,19 +346,15 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def send_json(self, status, payload):
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _reply(self, status, payload):
-        """Send JSON, swallowing client-disconnect errors (nothing else can)."""
         try:
-            self.send_json(status, payload)
-        except (BrokenPipeError, ConnectionResetError, OSError):
-            pass
+            body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except OSError:
+            pass  # client disconnected; nothing left to answer
 
     def send_error_json(self, status, message):
         self.send_json(status, {"ok": False, "error": message})
