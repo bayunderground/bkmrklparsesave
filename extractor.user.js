@@ -353,6 +353,57 @@
     }
   }
 
+  // --- client-side markdown approximation of the server format (labelled
+  // as such in the UI): same shape, no ID markers, server may sanitize more ---
+
+  function mdSafe(text) {
+    return String(text).replace(/<!--/g, '&lt;!--');
+  }
+
+  function mdScalar(v) {
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (typeof v === 'number') return String(v);
+    if (v === null || v === undefined) return '';
+    return String(v);
+  }
+
+  function mdField(name, value) {
+    var label = mdSafe(String(name).replace(/[\n:]/g, ' ').trim()) || 'Field';
+    if (Array.isArray(value)) {
+      var lines = ['- ' + label + ':'];
+      value.forEach(function (v) { lines.push('  - ' + mdSafe(mdScalar(v))); });
+      return lines.join('\n');
+    }
+    var parts = mdSafe(mdScalar(value)).split('\n');
+    if (parts.length === 1) return '- ' + label + ': ' + parts[0].trim();
+    var out = ['- ' + label + ':'];
+    parts.forEach(function (p) { out.push(p.trim() ? '  ' + p : '  '); });
+    return out.join('\n');
+  }
+
+  function mdItem(item) {
+    var names = Object.keys(item.fields);
+    var first = names.length ? item.fields[names[0]] : 'Item';
+    if (Array.isArray(first)) first = first.join(', ');
+    var title = mdScalar(first).split('\n')[0];
+    title = title.replace(/\s+/g, ' ').replace(/^#+\s*/, '').trim()
+      .slice(0, 100) || 'Item';
+    var out = ['## ' + mdSafe(title), ''];
+    out.push('<!-- item-id: computed by the server -->', '');
+    names.forEach(function (n) { out.push(mdField(n, item.fields[n])); });
+    out.push('', '---', '');
+    return out.join('\n');
+  }
+
+  function resultText(result, mode) {
+    if (mode === 'md') return result.items.map(mdItem).join('\n');
+    return JSON.stringify(
+      { rule: result.rule, url: result.url, items: result.items,
+        errors: result.errors },
+      null, 2
+    );
+  }
+
   function showResult(result) {
     closePreview();
     var ui = makeOverlay();
@@ -360,11 +411,27 @@
     ui.result = result;
     setHeaderCounts(ui, result.rule);
 
-    ui.body.appendChild(el('pre', 'message', JSON.stringify(
-      { rule: result.rule, url: result.url, items: result.items,
-        errors: result.errors },
-      null, 2
-    )));
+    var tabs = el('div', 'tabs');
+    var jsonBtn = el('button', 'primary', 'JSON');
+    var mdBtn = el('button', '', 'Markdown');
+    tabs.appendChild(jsonBtn);
+    tabs.appendChild(mdBtn);
+    tabs.appendChild(el('span', 'note',
+      'Markdown view is a client-side approximation of the server file'));
+    var pre = el('pre', 'message');
+    ui.body.appendChild(tabs);
+    ui.body.appendChild(pre);
+    ui.pre = pre;
+
+    var setMode = function (mode) {
+      ui.mode = mode;
+      jsonBtn.className = mode === 'json' ? 'primary' : '';
+      mdBtn.className = mode === 'md' ? 'primary' : '';
+      pre.textContent = resultText(result, mode);
+    };
+    jsonBtn.addEventListener('click', function () { setMode('json'); });
+    mdBtn.addEventListener('click', function () { setMode('md'); });
+    setMode('json');
 
     var cancel = el('button', '', 'Cancel');
     cancel.addEventListener('click', closePreview); // transmits nothing
