@@ -48,4 +48,53 @@
   });
   // === RULES END ===
 
+  // --- rule helpers (the only three; see extractor-spec.md) ---
+
+  function $text(el, sel) {
+    var m = el.querySelector(sel);
+    return m ? m.textContent.trim() : null;
+  }
+
+  function $attr(el, sel, name) {
+    var m = el.querySelector(sel);
+    if (!m) return null;
+    var v = m.getAttribute(name);
+    return v === null ? null : v;
+  }
+
+  function $all(el, sel) {
+    return Array.prototype.map.call(el.querySelectorAll(sel), function (n) {
+      return n.textContent.trim();
+    });
+  }
+
+  // --- rule matching ---
+
+  function errText(ruleName, index, field, err) {
+    var where = ruleName || '?';
+    if (index !== null && index !== undefined) where += '[' + index + ']';
+    if (field) where += '.' + field;
+    return where + ': ' + (err && err.message ? err.message : String(err));
+  }
+
+  function ruleMatches(rule, url, doc) {
+    var m = rule.match;
+    if (typeof m === 'string') return url.indexOf(m) !== -1;
+    if (m instanceof RegExp) return m.test(url);
+    if (typeof m === 'function') return !!m(url, doc);
+    return false;
+  }
+
+  function matchingRules(doc, errors) {
+    var url = location.href;
+    return rules.filter(function (rule) {
+      try {
+        return ruleMatches(rule, url, doc);
+      } catch (err) {
+        errors.push(errText(rule.name, null, null, err));
+        return false; // a broken matcher must not hide the other rules
+      }
+    });
+  }
+
 })();
