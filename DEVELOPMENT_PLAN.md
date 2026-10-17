@@ -173,8 +173,8 @@ The README states: the first-field fallback treats different items with identica
 Each phase ends runnable and verified before the next starts.
 
 ### Phase 0 — Skeleton
-- [ ] Repo layout per `CLAUDE.md`; `.gitignore` (`data/`, `__pycache__/`)
-- [ ] `tests/fixtures/` with `shop.html` (≥5 product cards, one sold out, one with multiline description, Unicode/emoji text, one without price) and `empty.html`
+- [x] Repo layout per `CLAUDE.md`; `.gitignore` (`data/`, `__pycache__/`)
+- [x] `tests/fixtures/` with `shop.html` (≥5 product cards, one sold out, one with multiline description, Unicode/emoji text, one without price) and `empty.html`
 
 ### Phase 1 — `server.py`
 - [ ] Config via env: `BKMRKLPARSESAVE_HOST` (default `127.0.0.1`), `BKMRKLPARSESAVE_PORT` (`8765`), `BKMRKLPARSESAVE_DATA` (`./data`)
