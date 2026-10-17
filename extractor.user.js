@@ -448,6 +448,11 @@
     jsonBtn.addEventListener('click', function () { setMode('json'); });
     mdBtn.addEventListener('click', function () { setMode('md'); });
     setMode('json');
+
+    var saveBtn = el('button', 'primary', 'Save All');
+    saveBtn.disabled = true; // enabled when the transport lands (Phase 5)
+    ui.saveBtn = saveBtn;
+    ui.footer.appendChild(saveBtn);
     addCancel(ui);
   }
 
