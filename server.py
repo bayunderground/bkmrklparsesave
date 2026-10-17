@@ -53,6 +53,75 @@ def marker_id(item):
     return digest[:16]
 
 
+def sanitize_text(text):
+    """User text must never forge an HTML comment marker."""
+    return text.replace("<!--", "&lt;!--")
+
+
+def render_scalar(value):
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def render_title(fields):
+    """Title = first field, first line, collapsed, <=100 chars, '#' stripped."""
+    first = next(iter(fields.values()))
+    if isinstance(first, list):
+        raw = ", ".join(
+            render_scalar(v) for v in first if not isinstance(v, str) or v.strip()
+        )
+    else:
+        raw = render_scalar(first)
+    line = raw.replace("\r\n", "\n").replace("\r", "\n").split("\n", 1)[0]
+    line = " ".join(line.split()).lstrip("#").strip()[:100].strip()
+    return line or "Item"
+
+
+def render_field(label, value):
+    """Render one field as markdown lines; blank means the field is omitted."""
+    safe_label = sanitize_text(" ".join(str(label).replace(":", " ").split()))
+    safe_label = safe_label or "Field"
+    if isinstance(value, list):
+        parts = [sanitize_text(render_scalar(v)) for v in value if v is not None]
+        parts = [p for p in parts if p.strip()]
+        if not parts:
+            return []
+        out = ["- %s:" % safe_label]
+        for part in parts:
+            lines = part.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+            out.append("  - " + lines[0])
+            for extra in lines[1:]:
+                # 4-space continuation keeps text below the bullet, never column 0.
+                out.append("    " + extra)
+        return out
+    text = sanitize_text(render_scalar(value)).replace("\r\n", "\n").replace("\r", "\n")
+    lines = text.split("\n")
+    if not any(line.strip() for line in lines):
+        return []
+    if len(lines) == 1:
+        return ["- %s: %s" % (safe_label, lines[0].strip())]
+    out = ["- %s:" % safe_label]
+    for line in lines:
+        out.append("  " + line if line.strip() else "  ")
+    return out
+
+
+def render_section(item, marker):
+    """One item -> one markdown section ending with '---'."""
+    fields = item["fields"]
+    lines = ["## %s" % sanitize_text(render_title(fields)), ""]
+    lines.append("<!-- item-id: %s -->" % marker)
+    lines.append("")
+    for label, value in fields.items():
+        lines.extend(render_field(label, value))
+    lines.append("")
+    lines.append("---")
+    return "\n".join(lines)
+
+
 class ValidationError(Exception):
     """Client mistake: answered with a 4xx JSON error, never a traceback."""
 
