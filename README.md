@@ -70,3 +70,60 @@ click **Save All**; the file is `data/products.md`. Click **Save All** again:
 everything is skipped — duplicates are detected by ID, never by timestamps.
 
 **Cancel** or `Esc` closes the preview and transmits nothing.
+
+## Adding a rule with an LLM
+
+Rules live in one block in `extractor.user.js` (between `// === RULES START ===`
+and `// === RULES END ===`). The engine is never touched — only rules are
+pasted in.
+
+Give an LLM three things: **`extractor-spec.md`** (the API), **a sample of the
+page HTML** (save it from the browser: right-click → *Save Page As*, or copy
+the relevant cards' outerHTML), and a description of the fields. Example
+prompt:
+
+```text
+Attached: extractor-spec.md (the rule API) and a sample of the page HTML.
+
+Page URL: https://example.com/shop/page/2
+Task: Extract every product card. Fields: title, price as a number, whether it is
+in stock, absolute product URL, and the tags. Skip items without a price.
+Use the SKU from the data-sku attribute as the explicit id.
+Rule name: products
+
+Follow extractor-spec.md exactly. Output only one rules.push({...}) block, then a
+short "Uncertainties" list. Do not invent selectors that are not in the HTML.
+```
+
+Paste the returned block into the RULES block, reload the userscript in the
+Tampermonkey dashboard, and try it on the page. Never accept a rule that uses
+classes not present in your sample — that is the LLM's most common failure.
+
+## Duplicates and the first-field caveat
+
+Duplicate detection is scoped to one rule's file and uses, in order:
+
+1. the explicit `id` you extract (recommended: SKU, ISBN, `data-*`, slug),
+2. otherwise the **first field's value**,
+3. otherwise a SHA-256 hash of the fields.
+
+Consequence: two *different* items whose first-field values are identical are
+treated as duplicates — the second one is silently skipped. Fix: extract a
+stable `id`, or put a genuinely unique field first. Timestamps are never used,
+so re-running a page is always safe.
+
+## Limitations
+
+- **Dynamic content:** extraction runs on the DOM as it is when you click.
+  Infinite scroll, "load more", and SPAs must be expanded first, then click.
+- **Iframes and shadow DOM** are not reachable; if the items live inside one,
+  the rule cannot see them.
+- **CSP vs bookmarklets:** Chrome ignores page CSP for `javascript:` URLs;
+  some Firefox pages still refuse them. Fallback: Tampermonkey menu →
+  **"Extract this page"** (same code path).
+- **`@connect` must match the server host:** if the server address changes,
+  edit `CONFIG.server` and the `@connect` header line together.
+- **Locked-down browsers/policies** may disable `javascript:` bookmarklets or
+  user scripts entirely; nothing can work then.
+- **Chromium "Allow User Scripts":** required since Chrome/Edge 138 (see
+  above); if the userscript never answers, this is the first thing to check.
