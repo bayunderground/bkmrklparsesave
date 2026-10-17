@@ -557,8 +557,21 @@
     else if (start.kind === 'many') showMany(start);
   }
 
-  // TEMP dev trigger while the bookmarklet listener is not wired yet
-  // (Phase 5 replaces it): bkmrklDevRun() from the console opens the preview.
+  // --- triggers: listener + menu fallback; nothing else runs on page load ---
+
+  window.addEventListener('message', function (event) {
+    // String payloads only: objects do not cross the sandbox boundary reliably.
+    if (event.source !== window || event.data !== 'bkmrklparsesave:run') return;
+    window.postMessage('bkmrklparsesave:ack', '*'); // ack first, extraction next
+    openPreview(startExtraction());
+  });
+
+  // Fallback when a site's CSP blocks javascript: bookmarklets.
+  GM_registerMenuCommand('Extract this page', function () {
+    openPreview(startExtraction());
+  });
+
+  // TEMP dev trigger; removed once the bookmarklet path is the only one.
   window.bkmrklDevRun = function () { openPreview(startExtraction()); };
 
 })();
