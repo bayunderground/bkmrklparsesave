@@ -231,3 +231,21 @@ Uncertainties:
 
 Never paper over uncertainty with a guessed selector: list it instead, and
 ask for more HTML rather than guessing.
+
+## Prompt template (copy, fill in, attach the HTML)
+
+```text
+Attached: extractor-spec.md (the rule API) and a sample of the page HTML.
+
+Page URL: https://example.com/shop/page/2
+Task: Extract every product card. Fields: title, price as a number, whether it is
+in stock, absolute product URL, and the tags. Skip items without a price.
+Use the SKU from the data-sku attribute as the explicit id.
+Rule name: products
+
+Follow extractor-spec.md exactly. Output only one rules.push({...}) block, then a
+short "Uncertainties" list. Do not invent selectors that are not in the HTML.
+```
+
+Variations: paste the HTML of *each* interesting state (normal, sold out,
+empty page) when they differ, and say which URL each belongs to.
