@@ -210,10 +210,10 @@ Each phase ends runnable and verified before the next starts.
 - [x] Usable on pages with hundreds of items (render text in a single `<pre>`, not per-item DOM nodes)
 
 ### Phase 5 — Transport and bookmarklet
-- [ ] `GM_xmlhttpRequest` POST to `CONFIG.server + '/save'`, `Content-Type: application/json`, 15 s timeout, no retry
-- [ ] Save All disabled after click; result panel shows saved/skipped/file, or the exact error (HTTP status, network error, timeout with the "may have been written; re-saving is safe" note)
-- [ ] `message` listener (`bkmrklparsesave:run` → ack → start) and `GM_registerMenuCommand('Extract this page')`
-- [ ] `bookmarklet.txt` with the `javascript:` URL (URL-safe, single line) and install notes for Firefox (bookmarks toolbar → Add bookmark; or drag) and Chromium (bookmark manager → Add new bookmark; paste into URL), including the Chrome/Edge "Allow User Scripts" step and the CSP fallback
+- [x] `GM_xmlhttpRequest` POST to `CONFIG.server + '/save'`, `Content-Type: application/json`, 15 s timeout, no retry
+- [x] Save All disabled after click; result panel shows saved/skipped/file, or the exact error (HTTP status, network error, timeout with the "may have been written; re-saving is safe" note)
+- [x] `message` listener (`bkmrklparsesave:run` → ack → start) and `GM_registerMenuCommand('Extract this page')`
+- [x] `bookmarklet.txt` with the `javascript:` URL (URL-safe, single line) and install notes for Firefox (bookmarks toolbar → Add bookmark; or drag) and Chromium (bookmark manager → Add new bookmark; paste into URL), including the Chrome/Edge "Allow User Scripts" step and the CSP fallback
 
 ### Phase 6 — `extractor-spec.md` (written for an LLM reader)
 - [ ] Task statement: "Output exactly one `rules.push({...});` block and nothing else"
