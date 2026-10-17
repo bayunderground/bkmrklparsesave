@@ -136,5 +136,73 @@ class SaveDedupeTest(ServerTestCase):
         self.assertEqual(self.read_md("dup").count("## Same"), 1)
 
 
+class IdFallbackTest(ServerTestCase):
+    def test_explicit_id_wins_even_when_titles_match(self):
+        self.save(
+            {
+                "rule": "ids",
+                "items": [{"id": "SKU-1", "fields": {"Title": "Same"}}],
+            }
+        )
+        status, body = self.save(
+            {"rule": "ids", "items": [{"id": "SKU-2", "fields": {"Title": "Same"}}]}
+        )
+        self.assertEqual((body["saved"], body["skipped"]), (1, 0))
+        self.assertEqual(self.read_md("ids").count("## Same"), 2)
+
+    def test_explicit_id_strips_whitespace(self):
+        self.save({"rule": "trim", "items": [{"id": "  ABC  ", "fields": {"T": "x"}}]})
+        status, body = self.save(
+            {"rule": "trim", "items": [{"id": "ABC", "fields": {"T": "y"}}]}
+        )
+        self.assertEqual((body["saved"], body["skipped"]), (0, 1))
+
+    def test_first_field_fallback(self):
+        self.save({"rule": "first", "items": [{"fields": {"Title": "Hero", "Price": 1}}]})
+        status, body = self.save(
+            {"rule": "first", "items": [{"fields": {"Title": "Hero", "Price": 999}}]}
+        )
+        # Same first field -> same identifier -> skipped, per the documented caveat.
+        self.assertEqual((body["saved"], body["skipped"]), (0, 1))
+
+    def test_first_field_collision_is_the_documented_caveat(self):
+        """Different items sharing the first-field value count as duplicates."""
+        self.save({"rule": "coll", "items": [{"fields": {"Title": "Widget", "Price": 5}}]})
+        status, body = self.save(
+            {"rule": "coll", "items": [{"fields": {"Title": "Widget", "Price": 77}}]}
+        )
+        self.assertEqual((body["saved"], body["skipped"]), (0, 1))
+        self.assertEqual(self.read_md("coll").count("<!-- item-id: "), 1)
+
+    def test_hash_fallback_when_first_field_empty(self):
+        a = self.save(
+            {"rule": "hash", "items": [{"fields": {"A": "", "B": "z", "C": "1"}}]}
+        )
+        b = self.save(
+            {"rule": "hash", "items": [{"fields": {"A": "", "B": "z", "C": "2"}}]}
+        )
+        self.assertEqual((a[1]["saved"], a[1]["skipped"]), (1, 0))
+        self.assertEqual((b[1]["saved"], b[1]["skipped"]), (1, 0))
+
+    def test_hash_fallback_is_key_order_independent(self):
+        one = self.save(
+            {"rule": "order", "items": [{"fields": {"A": "", "B": "", "C": "v"}}]}
+        )
+        two = self.save(
+            {"rule": "order", "items": [{"fields": {"C": "v", "B": "", "A": ""}}]}
+        )
+        self.assertEqual((one[1]["saved"], one[1]["skipped"]), (1, 0))
+        self.assertEqual((two[1]["saved"], two[1]["skipped"]), (0, 1))
+
+    def test_hash_fallback_identical_fields_skip(self):
+        self.save(
+            {"rule": "cannon", "items": [{"fields": {"A": "", "B": "", "X": "1", "Y": "2"}}]}
+        )
+        status, body = self.save(
+            {"rule": "cannon", "items": [{"fields": {"Y": "2", "X": "1", "B": "", "A": ""}}]}
+        )
+        self.assertEqual((body["saved"], body["skipped"]), (0, 1))
+
+
 if __name__ == "__main__":
     unittest.main()
