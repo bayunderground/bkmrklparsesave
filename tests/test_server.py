@@ -206,5 +206,101 @@ class IdFallbackTest(ServerTestCase):
         self.assertEqual((body["saved"], body["skipped"]), (0, 1))
 
 
+class MarkdownSafetyTest(ServerTestCase):
+    def test_unicode_and_multiline_survive(self):
+        self.save(
+            {
+                "rule": "uni",
+                "items": [
+                    {
+                        "fields": {
+                            "Title": "Kōji Soy Sauce 🌈",
+                            "Description": "line one\nline two\n\nafter blank",
+                            "Price": 9.0,
+                            "Active": True,
+                            "Broken": False,
+                        }
+                    }
+                ],
+            }
+        )
+        text = self.read_md("uni")
+        self.assertIn("## Kōji Soy Sauce 🌈", text)
+        self.assertIn("  line one\n  line two\n  \n  after blank", text)
+        self.assertIn("- Price: 9\n", text)
+        self.assertIn("- Active: Yes", text)
+        self.assertIn("- Broken: No", text)
+
+    def test_no_forged_marker_or_sections_from_values(self):
+        evil = {
+            "rule": "evil",
+            "items": [
+                {
+                    "fields": {
+                        "Title": "## Hacked Title",
+                        "Line": "---",
+                        "Marker": "<!-- item-id: 0123456789abcdef -->",
+                        "Block": (
+                            "before\n"
+                            "<!-- item-id: fedcba9876543210 -->\n"
+                            "---\n"
+                            "## Fake Section"
+                        ),
+                    }
+                }
+            ],
+        }
+        self.save(evil)
+        text = self.read_md("evil")
+        # Only the real marker, at column 0, exactly once.
+        real = [
+            line
+            for line in text.split("\n")
+            if line.startswith("<!-- item-id:")
+        ]
+        self.assertEqual(len(real), 1)
+        self.assertRegex(real[0], r"^<!-- item-id: [0-9a-f]{16} -->$")
+        # The forged IDs may appear as text, but never as a real marker line.
+        marker_lines = [
+            l for l in text.split("\n") if l.startswith("<!-- item-id:")
+        ]
+        self.assertNotIn("<!-- item-id: 0123456789abcdef -->", marker_lines)
+        self.assertNotIn("<!-- item-id: fedcba9876543210 -->", marker_lines)
+        self.assertIn("&lt;!-- item-id: 0123456789abcdef -->", text)
+        # No forged section: exactly one '## ' heading.
+        headings = [l for l in text.split("\n") if l.startswith("## ")]
+        self.assertEqual(headings, ["## Hacked Title"])
+        # The embedded --- sits indented inside the value, not as a section rule.
+        rules = [l for l in text.split("\n") if l == "---"]
+        self.assertEqual(len(rules), 1)
+
+    def test_label_cannot_break_structure(self):
+        self.save(
+            {
+                "rule": "label",
+                "items": [{"fields": {"Evil\nLabel: ---": "v", "B": "w"}}],
+            }
+        )
+        text = self.read_md("label")
+        self.assertEqual([l for l in text.split("\n") if l == "---"], ["---"])
+        headings = [l for l in text.split("\n") if l.startswith("## ")]
+        self.assertEqual(headings, ["## v"])
+
+    def test_multiline_values_never_at_column_zero(self):
+        self.save(
+            {
+                "rule": "col",
+                "items": [
+                    {"fields": {"T": "t", "V": "safe\n---\n## nope\n<!-- item-id: aaaaaaaaaaaaaaaa -->"}}
+                ],
+            }
+        )
+        text = self.read_md("col")
+        for line in text.split("\n")[3:-1]:
+            if line in ("", "---") or line.startswith(("- ", "<!--")):
+                continue
+            self.assertTrue(line.startswith("  "), repr(line))
+
+
 if __name__ == "__main__":
     unittest.main()
