@@ -223,4 +223,52 @@
     return items;
   }
 
+  // --- entry point: the preview UI calls these (Phase 4) ---
+
+  function describeRule(rule) {
+    return rule.name + ' — ' + String(rule.match);
+  }
+
+  function buildResult(rule, errors) {
+    return {
+      rule: rule.name,
+      url: location.href,
+      items: extractItems(rule, document, errors),
+      errors: errors
+    };
+  }
+
+  // kind: 'none' (no rule matches), 'one' (ready), 'many' (picker needed)
+  function startExtraction() {
+    var errors = [];
+    var found = matchingRules(document, errors);
+    if (found.length === 1) {
+      return { kind: 'one', result: buildResult(found[0], errors), errors: errors };
+    }
+    if (found.length === 0) {
+      return {
+        kind: 'none',
+        errors: errors,
+        url: location.href,
+        available: rules.map(describeRule)
+      };
+    }
+    return {
+      kind: 'many',
+      errors: errors,
+      choices: found.map(function (rule) {
+        return { rule: rule, label: describeRule(rule) };
+      })
+    };
+  }
+
+  function extractChoice(choice) {
+    var errors = [];
+    return { kind: 'one', result: buildResult(choice.rule, errors), errors: errors };
+  }
+
+  // TEMP dev trigger while there is no preview UI yet (Phase 5 replaces it):
+  // run bkmrklDevRun() from the console to inspect the extraction result.
+  window.bkmrklDevRun = function () { return startExtraction(); };
+
 })();
