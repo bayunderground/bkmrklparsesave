@@ -267,8 +267,117 @@
     return { kind: 'one', result: buildResult(choice.rule, errors), errors: errors };
   }
 
-  // TEMP dev trigger while there is no preview UI yet (Phase 5 replaces it):
-  // run bkmrklDevRun() from the console to inspect the extraction result.
-  window.bkmrklDevRun = function () { return startExtraction(); };
+  // --- preview UI (closed Shadow DOM: page CSS cannot reach it) ---
+
+  var preview = null; // { host, onKey, ... } while open
+
+  function closePreview() {
+    if (!preview) return;
+    document.removeEventListener('keydown', preview.onKey, true);
+    if (preview.host.parentNode) {
+      preview.host.parentNode.removeChild(preview.host);
+    }
+    preview = null;
+  }
+
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  function makeOverlay() {
+    var host = document.createElement('div');
+    var shadow = host.attachShadow({ mode: 'closed' });
+    document.documentElement.appendChild(host);
+
+    var style = document.createElement('style');
+    style.textContent = [
+      ':host { all: initial; }',
+      '* { box-sizing: border-box; }',
+      '.panel { position: fixed; inset: 0; z-index: 2147483647;',
+      '  background: #171717; color: #eaeaea; display: flex; flex-direction: column;',
+      '  font: 13px/1.45 ui-monospace, Consolas, Menlo, monospace; }',
+      '.header { flex: 0 0 auto; padding: 10px 14px; background: #222;',
+      '  border-bottom: 1px solid #3a3a3a; font-weight: bold; }',
+      '.header .count { font-weight: normal; color: #9c9c9c; margin-left: 10px; }',
+      '.header .count.warn { color: #ffb454; }',
+      '.body { flex: 1 1 auto; overflow: auto; padding: 10px 14px; }',
+      '.footer { flex: 0 0 auto; padding: 10px 14px; background: #222;',
+      '  border-top: 1px solid #3a3a3a; display: flex; gap: 8px; }',
+      'button { font: inherit; padding: 6px 14px; cursor: pointer;',
+      '  background: #333; color: #eaeaea; border: 1px solid #555; border-radius: 3px; }',
+      'button:hover { background: #404040; }',
+      'button.primary { background: #2b6cb0; border-color: #2b6cb0; }',
+      'button.primary:hover { background: #3182ce; }',
+      'button:disabled { opacity: .5; cursor: default; }',
+      '.tabs { margin-bottom: 8px; display: flex; gap: 6px; align-items: center; }',
+      '.tabs .note { color: #9c9c9c; font-size: 12px; }',
+      'pre { margin: 0; white-space: pre-wrap; word-break: break-word; }',
+      '.message { color: #d0d0d0; }'
+    ].join('\n');
+    shadow.appendChild(style);
+
+    var panel = el('div', 'panel');
+    shadow.appendChild(panel);
+    panel.appendChild(el('div', 'header'));
+    panel.appendChild(el('div', 'body'));
+    panel.appendChild(el('div', 'footer'));
+
+    var onKey = function (e) {
+      if (e.key === 'Escape' && preview) closePreview();
+    };
+    document.addEventListener('keydown', onKey, true);
+
+    return {
+      host: host,
+      panel: panel,
+      header: panel.children[0],
+      body: panel.children[1],
+      footer: panel.children[2],
+      onKey: onKey,
+      result: null,
+      mode: 'json'
+    };
+  }
+
+  function setHeaderCounts(ui, ruleName) {
+    ui.header.textContent = '';
+    ui.header.appendChild(el('span', '', ruleName));
+    ui.header.appendChild(el('span', 'count',
+      ui.result.items.length + ' item(s)'));
+    if (ui.result.errors.length) {
+      ui.header.appendChild(el('span', 'count warn',
+        ui.result.errors.length + ' error(s)'));
+    }
+  }
+
+  function showResult(result) {
+    closePreview();
+    var ui = makeOverlay();
+    preview = ui;
+    ui.result = result;
+    setHeaderCounts(ui, result.rule);
+
+    ui.body.appendChild(el('pre', 'message', JSON.stringify(
+      { rule: result.rule, url: result.url, items: result.items,
+        errors: result.errors },
+      null, 2
+    )));
+
+    var cancel = el('button', '', 'Cancel');
+    cancel.addEventListener('click', closePreview); // transmits nothing
+    ui.footer.appendChild(cancel);
+  }
+
+  function openPreview(start) {
+    if (start.kind === 'one') showResult(start.result);
+    // 'none' and 'many' panels arrive with the picker step.
+  }
+
+  // TEMP dev trigger while the bookmarklet listener is not wired yet
+  // (Phase 5 replaces it): bkmrklDevRun() from the console opens the preview.
+  window.bkmrklDevRun = function () { openPreview(startExtraction()); };
 
 })();
